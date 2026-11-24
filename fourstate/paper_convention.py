@@ -168,6 +168,11 @@ def main():
         K = raw - corr
         out.update(K=K, K_uncorrected=raw)
         print(f'\nBiquadratic: K = {K:+.3f} meV  (uncorrected {raw:+.3f}, single-ion correction {-corr:+.3f})')
+        if 'k1' in bq:
+            # same 4 runs: E(k1) - E(k2) = 2 J_xx (K cancels); E(k3) - E(k4) = sqrt2 (J_xx + J_xy) (approx.)
+            jxx = (bq['k1'] - bq['k2']) / 2
+            out['J_xx_from_bq'] = jxx
+            print(f'check: J_xx from k1/k2 = {jxx:+.3f} meV')
         if 'J' in out:
             print(f'K / J = {K / out["J"]:+.3f}')
     for n in notes:
