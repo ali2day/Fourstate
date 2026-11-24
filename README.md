@@ -37,7 +37,17 @@ S_j = +z = background, so they are the same for every j of the same i.
 `bq`: S_i = x, S_j at 0°, 180°, 45°, 225° in the xy plane, others z:
 K = −[(E1 + E2) − (E3 + E4)] + 2(a_x − a_45), where the single-ion term of j comes from a `sia` run
 (`analyze_bq.py runs_bq --sia runs_sia/results_sia.json`).
-Convention: H = −Σ S_i·J·S_j (unit spins, J > 0 ferromagnetic), as in TB2J.
+Convention of `analyze*.py`: H = −Σ S_i·J·S_j (unit spins, J > 0 ferromagnetic), as in TB2J.
+
+### Convention of arXiv:2407.20489 (`paper_convention.py`)
+H = Σ_i S_i·A·S_i + Σ_{i<j} S_i·𝒥_ij·S_j + Σ_{i<j} K_ij (S_i·S_j)², unit spins, meV, J < 0 ferromagnetic,
+J = Tr 𝒥/3, D from (𝒥 − 𝒥ᵀ)/2, Γ = (𝒥 + 𝒥ᵀ)/2 − J·1, K < 0 favours collinear spins, A^zz > 0 easy plane.
+```bash
+python fourstate/paper_convention.py --table eng_press.dat          # labels jxx1.., dx1.., a1.., k1..
+python fourstate/paper_convention.py --runs runs_exchange runs_sia runs_bq
+```
+Formulas (S_i = ±a, S_j = ±b, others ⟂): 𝒥_ab = [E(++) + E(−−) − E(+−) − E(−+)]/4;
+K = [E(k1) + E(k2)] − [E(k3) + E(k4)] − 2(a_x − a_45), with a_x = A_xx, a_45 = (A_xx + A_yy)/2 + A_xy.
 
 ## Use
 ```bash
@@ -71,6 +81,7 @@ python tests/test_gsc.py      # known M tensor + polarization quantum
 python tests/test_me.py       # 12-run ME scheme, states k1-k12
 python tests/test_sia.py      # known A tensor + reversed spin, --atoms
 python tests/test_bq.py       # known K + single-ion correction + reversed spin
+python tests/test_paper.py    # arXiv:2407.20489 convention from a table
 ```
 
 ## License
