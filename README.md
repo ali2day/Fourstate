@@ -42,6 +42,11 @@ python fourstate/analyze_gsc.py runs                     # M  (mode gsc)
   geometry. The standard method uses one fixed geometry.
 * `LORBIT = 11` is required (the analysis checks every moment).
 
+## Examples
+See `examples/`: NiI2 (exchange + ME tensor from the same runs) and VBr3 (exchange tensor).
+
+The `gsc` runs also give energies, so `analyze.py` and `analyze_gsc.py` can both be used on them.
+
 ## Tests
 ```bash
 python tests/test_energy.py   # known J tensor + spin flip
