@@ -15,6 +15,8 @@ Modes
   iso    : collinear, 4 runs per bond             -> isotropic J
   tensor : noncollinear + SOC, 36 runs per bond   -> full 3x3 J (J_iso, DMI, anisotropy)
   gsc    : same 36 states as tensor, with Berry-phase polarization -> GSC tensor M (P = S_i M S_j)
+  me     : 12 runs, background +z: (S_i,S_j) along (x,y), (x,z), (y,z) -> spin-current ME matrix
+           P = M_sc (S_i x S_j); k5, k7, k9, k11 (S_j = +z = background) are the same for every j
   sia    : only atom i rotated (20 runs)              -> single-ion anisotropy A (H = S A S)
   bq     : S_i = x, S_j at 0/180/45/225 deg, others z (4 runs) -> biquadratic K (H = -J S_i.S_j - K (S_i.S_j)^2)
 Pair: --bonds (symmetry + automatic supercell) or --atoms i j (by hand, in the given cell)
@@ -126,6 +128,13 @@ def states(mode):
     """(label, a, b, c, si, sj): S_i = si*a, S_j = sj*b, background along c.
     sia: (label, vi, None, c, 0, 0) with vi the unit vector of S_i (only atom i is rotated)."""
     sg = [(1, 1, 'pp'), (1, -1, 'pm'), (-1, 1, 'mp'), (-1, -1, 'mm')]
+    if mode == 'me':       # spin-current ME scheme (12 runs): background always +z, as in the NiI2 V_I study
+        n = 0              # k1-4: (x, y)  k5-8: (x, z)  k9-12: (y, z);  each ++ +- -+ --
+        for a, b in (('x', 'y'), ('x', 'z'), ('y', 'z')):
+            for si, sj, t in sg:
+                n += 1
+                yield f'k{n}', a, b, 'z', si, sj
+        return
     if mode == 'bq':       # biquadratic: S_i = x, S_j at angle 0, 180, 45, 225 deg in the xy plane, others z
         t = R2 * (AX['x'] + AX['y'])
         for lab, vj in (('k1', AX['x']), ('k2', -AX['x']), ('k3', t), ('k4', -t)):
@@ -229,7 +238,7 @@ def main():
     ap.add_argument('--rclean', type=float, default=None,
                     help='no image of j closer than this to i (A); default = longest selected bond')
     ap.add_argument('--supercell', type=int, nargs=3, help='force a diagonal supercell')
-    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc', 'sia', 'bq'], default='tensor',
+    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc', 'me', 'sia', 'bq'], default='tensor',
                     help='sia = single-ion anisotropy of atom i (20 runs); bq = biquadratic K of a pair (4 runs)')
     ap.add_argument('--incar', help='INCAR template with a {MAGMOM} line')
     ap.add_argument('--potcar-dir', help='folder with <Element>/POTCAR')
@@ -253,7 +262,7 @@ def main():
 
     if not ((a.bonds or a.atoms) and a.incar):
         raise SystemExit('build needs --incar and --bonds or --atoms')
-    if a.mode == 'gsc' and a.relax:
+    if a.mode in ('gsc', 'me') and a.relax:
         raise SystemExit('gsc needs one fixed geometry for all states (no --relax)')
     mom = moments(a.mag, a.moment)
 

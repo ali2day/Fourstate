@@ -50,13 +50,14 @@ def read_outcar(path, nat, step=-1):
     num = r'\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)'
     pe = re.findall(r'p\[elc\]=' + num, txt)
     pi = re.findall(r'p\[ion\]=' + num, txt)
-    dip = None
+    dip = dip_elc = None
     if pe:
-        dip = np.array(pe[step], float) + (np.array(pi[step], float) if pi else 0)
+        dip_elc = np.array(pe[step], float)
+        dip = dip_elc + (np.array(pi[step], float) if pi else 0)
     conv = 'aborting loop because EDIFF is reached' in txt
     if re.search(r'^\s*NSW\s*=\s*[1-9]', txt, re.M):
         conv = conv and 'reached required accuracy' in txt
-    return dict(E=float(e[step]), Ep=float(ep[0]), m=m, dip=dip, conv=conv,
+    return dict(E=float(e[step]), Ep=float(ep[0]), m=m, dip=dip, dip_elc=dip_elc, conv=conv,
                 nsteps=nsteps)
 
 

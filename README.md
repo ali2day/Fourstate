@@ -25,11 +25,15 @@ Requires Python 3 with `numpy`, `ase`, `spglib`.
 |---|---|---|---|
 | `iso` | 4 / bond (collinear) | J_iso | `analyze.py` |
 | `tensor` | 36 / bond (SOC) | 3×3 J, J_iso, DMI, anisotropic exchange | `analyze.py` |
-| `gsc` | 36 / bond (SOC + Berry phase) | ME tensor M, P = S_i · M · S_j | `analyze_gsc.py` |
+| `gsc` | 36 / bond (SOC + Berry phase) | full ME tensor M, P = S_i · M · S_j | `analyze_gsc.py` |
+| `me` | 12 / bond (SOC + Berry phase) | spin-current ME matrix, P = M (S_i × S_j) | `analyze_gsc.py` |
 | `sia` | 20 / site (SOC) | single-ion anisotropy A, H = S · A · S | `analyze_sia.py` |
 | `bq` | 4 / bond (SOC) | biquadratic K, H = −J S_i·S_j − K (S_i·S_j)² | `analyze_bq.py` |
 
 For component (a, b): S_i = ±a, S_j = ±b, all other spins along the third axis c.
+`me`: background +z; k1–4 (S_i, S_j) = (±x, ±y), k5–8 (±x, ±z), k9–12 (±y, ±z);
+M[:,z] = (P1+P4−P2−P3)/4, M[:,y] = (P6+P7−P5−P8)/4, M[:,x] = (P9+P12−P10−P11)/4. k5, k7, k9, k11 have
+S_j = +z = background, so they are the same for every j of the same i.
 `bq`: S_i = x, S_j at 0°, 180°, 45°, 225° in the xy plane, others z:
 K = −[(E1 + E2) − (E3 + E4)] + 2(a_x − a_45), where the single-ion term of j comes from a `sia` run
 (`analyze_bq.py runs_bq --sia runs_sia/results_sia.json`).
@@ -64,6 +68,7 @@ ME tensor, single-ion anisotropy and biquadratic exchange (Ni 9 – Ni 12). `exa
 ```bash
 python tests/test_energy.py   # known J tensor + spin flip
 python tests/test_gsc.py      # known M tensor + polarization quantum
+python tests/test_me.py       # 12-run ME scheme, states k1-k12
 python tests/test_sia.py      # known A tensor + reversed spin, --atoms
 python tests/test_bq.py       # known K + single-ion correction + reversed spin
 ```

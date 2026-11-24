@@ -9,7 +9,9 @@ one fixed geometry, LCALCPOL in the INCAR).
     M_ab = [P(+a,+b) + P(-a,-b) - P(+a,-b) - P(-a,+b)] / 4
 P = p[elc] + p[ion] from the OUTCAR (e*A).  Each P is first brought to the branch of a reference
 run by removing polarization quanta e*R (R = supercell lattice vectors).
-Also printed: the spin-current part M_anti = (M_ab - M_ba)/2 written as P = M_sc (S_i x S_j)
+--mode me (12 runs, background +z): only M_xy, M_xz, M_yz; printed as the 3x3 matrix
+P = M (S_i x S_j) with M[:,z] = (P1+P4-P2-P3)/4, M[:,y] = (P6+P7-P5-P8)/4, M[:,x] = (P9+P12-P10-P11)/4.
+Also printed (gsc): the spin-current part M_anti = (M_ab - M_ba)/2 written as P = M_sc (S_i x S_j)
 (3x3: column k = component (S_i x S_j)_k).  Written to RUNS/results_gsc.json (units e*A).
 """
 import argparse, json
@@ -27,10 +29,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('runs')
     ap.add_argument('--cosmin', type=float, default=0.9)
+    ap.add_argument('--elc-only', action='store_true',
+                    help='use p[elc] only (as output_vasp_polar.sh); the ionic part is the same in every '
+                         'state at fixed geometry, so M does not change')
     a = ap.parse_args()
     res = []
     for b, meta, slots, notes, cell in collect(a.runs, a.cosmin, -1):
-        P = {k: o['dip'] for k, (o, _) in slots.items() if o['dip'] is not None}
+        key = 'dip_elc' if a.elc_only else 'dip'
+        P = {k: o[key] for k, (o, _) in slots.items() if o[key] is not None}
         if len(P) < len(slots):
             notes.append('some runs have no p[elc] (LCALCPOL missing?)')
         M = np.full((3, 3, 3), np.nan)                  # M[a, b, :] = vector
@@ -46,8 +52,16 @@ def main():
         print(f'\nbond {b["id"]:2d}  d = {b["d"]:.3f} A   (units 1e-5 e*A)')
         for x in 'xyz':
             for y in 'xyz':
-                print('   M_%s%s = (%+9.1f %+9.1f %+9.1f)' % (x, y, *(1e5 * M[AX[x], AX[y]])))
-        if not np.isnan(M).any():
+                if not np.isnan(M[AX[x], AX[y]]).any():
+                    print('   M_%s%s = (%+9.1f %+9.1f %+9.1f)' % (x, y, *(1e5 * M[AX[x], AX[y]])))
+        if meta['mode'] == 'me':
+            # 12-run scheme: only (x,y), (x,z), (y,z) are computed; with P = M_sc (S_i x S_j):
+            #   column z <- M_xy,  column y <- -M_xz (x cross z = -y),  column x <- M_yz
+            sc = np.array([M[1, 2], -M[0, 2], M[0, 1]]).T
+            r['M_spin_current'] = sc.tolist()
+            print('   ME matrix (P = M . S_i x S_j), rows P_x,y,z, columns (S_i x S_j)_x,y,z:')
+            print(np.array2string(1e5 * sc, precision=1, suppress_small=True, prefix='   '))
+        elif not np.isnan(M).any():
             # P = M_sc (S_i x S_j):  (S_i x S_j)_k = eps_kab S_ia S_jb  ->  M_sc[:, k] = (M_ab - M_ba)/2
             sc = np.array([(M[1, 2] - M[2, 1]) / 2, (M[2, 0] - M[0, 2]) / 2, (M[0, 1] - M[1, 0]) / 2]).T
             r['M_spin_current'] = sc.tolist()
