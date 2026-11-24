@@ -1,4 +1,4 @@
-SYSTEM = 4-state SOC (GSC polarization)
+SYSTEM = 4-state SOC (GSC polarization mapping, Berry phase)
 PREC     = Accurate
 ENCUT    = 500          # set for your POTCARs
 ISTART   = 0
@@ -7,7 +7,7 @@ LASPH    = .TRUE.
 LREAL    = .FALSE.
 ISYM     = -1           # spin states break the symmetry
 ALGO     = Fast
-EDIFF    = 1E-7         # J needs tight energies
+EDIFF    = 1E-7         # tight: P differences are small
 NELM     = 400
 ISMEAR   = 0
 SIGMA    = 0.01
@@ -31,8 +31,13 @@ LAMBDA   = 10
 RWIGS    = 1.2 1.2      # one Wigner-Seitz radius per species
 {MAGMOM}
 
-LCALCPOL = .TRUE.       # Berry phase p[elc], p[ion] (insulators only)
-DIPOL    = 0.5 0.5 0.5
+NSW      = 0            # one fixed geometry for all states
+
+# Berry phase (King-Smith-Vanderbilt), insulators only -> p[elc], p[ion] in the OUTCAR
+LCALCPOL = .TRUE.
+LPEAD    = .TRUE.       # also derivatives of the cell-periodic orbitals (finite differences)
+IPEAD    = 4            # order of the finite-difference stencil
+# no LDIPOL / DIPOL here: dipole corrections change P and are not part of the method
 
 LORBIT   = 11           # needed: the analysis checks every moment
 LWAVE    = .FALSE.
