@@ -40,8 +40,10 @@ K = −[(E1 + E2) − (E3 + E4)] + 2(a_x − a_45), where the single-ion term of
 Convention of `analyze*.py`: H = −Σ S_i·J·S_j (unit spins, J > 0 ferromagnetic), as in TB2J.
 
 ### Convention of arXiv:2407.20489 (`paper_convention.py`)
-H = Σ_i S_i·A·S_i + Σ_{i<j} S_i·𝒥_ij·S_j + Σ_{i<j} K_ij (S_i·S_j)², unit spins, meV, J < 0 ferromagnetic,
-J = Tr 𝒥/3, D from (𝒥 − 𝒥ᵀ)/2, Γ = (𝒥 + 𝒥ᵀ)/2 − J·1, K < 0 favours collinear spins, A^zz > 0 easy plane.
+
+$$H=\sum_i \mathbf S_i\cdot\mathbf A_{ii}\cdot\mathbf S_i+\sum_{i<j}\mathbf S_i\cdot\mathcal J_{ij}\cdot\mathbf S_j+\sum_{i<j}K_{ij}(\mathbf S_i\cdot\mathbf S_j)^2$$
+
+Unit spins, each pair once, meV; $J<0$ ferromagnetic, $K<0$ favours collinear spins.
 Full explanation, derivations and a NiI2 worked example: **[CONVENTIONS.md](CONVENTIONS.md)**.
 ```bash
 python fourstate/extract.py all_sub_9_6 > eng.dat                   # run folders -> one line per run
