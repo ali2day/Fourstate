@@ -16,8 +16,8 @@ Requires Python 3 with `numpy`, `ase`, `spglib`.
 
 ```math
 H=\sum_i \mathbf S_i\cdot\mathbf A_{ii}\cdot\mathbf S_i
-+\sum_{i<j}\mathbf S_i\cdot\mathcal J_{ij}\cdot\mathbf S_j
-+\sum_{i<j}K_{ij}\,(\mathbf S_i\cdot\mathbf S_j)^2
++\sum_{i\lt j}\mathbf S_i\cdot\mathcal J_{ij}\cdot\mathbf S_j
++\sum_{i\lt j}K_{ij}\,(\mathbf S_i\cdot\mathbf S_j)^2
 ```
 
 ```math
@@ -25,11 +25,11 @@ H=\sum_i \mathbf S_i\cdot\mathbf A_{ii}\cdot\mathbf S_i
 =J_{ij}\,\mathbf S_i\cdot\mathbf S_j+\mathbf D_{ij}\cdot(\mathbf S_i\times\mathbf S_j)+\mathbf S_i\cdot\Gamma_{ij}\cdot\mathbf S_j
 ```
 
-Unit spins, each pair counted once, meV. $`J<0`$ ferromagnetic, $`K<0`$ favours collinear spins,
-$`A^{zz}>0`$ easy plane. Derivations of every formula: **[CONVENTIONS.md](CONVENTIONS.md)**.
+Unit spins, each pair counted once, meV. $`J\lt 0`$ ferromagnetic, $`K\lt 0`$ favours collinear spins,
+$`A^{zz}\gt 0`$ easy plane. Derivations of every formula: **[CONVENTIONS.md](CONVENTIONS.md)**.
 
 > `analyze.py`, `analyze_sia.py`, `analyze_bq.py` print the TB2J sign
-> ($`H=-\sum_{i<j}\mathbf S_i\cdot\mathbf J_{ij}\cdot\mathbf S_j`$, $`J>0`$ ferromagnetic);
+> ($`H=-\sum_{i\lt j}\mathbf S_i\cdot\mathbf J_{ij}\cdot\mathbf S_j`$, $`J\gt 0`$ ferromagnetic);
 > `paper_convention.py` prints the convention above ($`\mathcal J=-\mathbf J^{\mathrm{TB2J}}`$, $`K=-K^{\mathrm{TB2J}}`$).
 
 ## Four-state formulas

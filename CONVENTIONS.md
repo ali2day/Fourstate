@@ -6,8 +6,8 @@ We use the Hamiltonian of Ghojavand *et al.*, arXiv:2407.20489 (Eqs. 1–2):
 
 ```math
 H \;=\; \sum_{i} \mathbf{S}_i \cdot \mathbf{A}_{ii} \cdot \mathbf{S}_i
-\;+\; \sum_{i<j} \mathbf{S}_i \cdot \mathcal{J}_{ij} \cdot \mathbf{S}_j
-\;+\; \sum_{i<j} K_{ij} \left( \mathbf{S}_i \cdot \mathbf{S}_j \right)^2 ,
+\;+\; \sum_{i\lt j} \mathbf{S}_i \cdot \mathcal{J}_{ij} \cdot \mathbf{S}_j
+\;+\; \sum_{i\lt j} K_{ij} \left( \mathbf{S}_i \cdot \mathbf{S}_j \right)^2 ,
 ```
 
 where the exchange tensor $`\mathcal{J}_{ij}`$ is decomposed as
@@ -31,14 +31,14 @@ D^{z}_{ij} = \tfrac{1}{2}\left( \mathcal{J}^{xy}_{ij} - \mathcal{J}^{yx}_{ij} \r
 
 **Conventions**
 
-* $`\mathbf{S}_i`$ is a **unit vector**; every pair is counted **once** ($`i<j`$); energies in meV.
-* $`J_{ij} < 0`$: ferromagnetic, $`J_{ij} > 0`$: antiferromagnetic.
-* $`K_{ij} < 0`$ favours collinear spins.
-* $`A^{zz} > 0`$: easy plane, $`A^{zz} < 0`$: easy axis.
+* $`\mathbf{S}_i`$ is a **unit vector**; every pair is counted **once** ($`i\lt j`$); energies in meV.
+* $`J_{ij} \lt  0`$: ferromagnetic, $`J_{ij} \gt  0`$: antiferromagnetic.
+* $`K_{ij} \lt  0`$ favours collinear spins.
+* $`A^{zz} \gt  0`$: easy plane, $`A^{zz} \lt  0`$: easy axis.
 * $`x, y, z`$ are the Cartesian axes of the VASP cell (the directions written in `MAGMOM` / `M_CONSTR`, `SAXIS = 0 0 1`).
 
 **Relation to the TB2J sign** (used by `analyze.py`, `analyze_sia.py`, `analyze_bq.py`,
-$`H = -\sum_{i<j} \mathbf{S}_i \cdot \mathbf{J}_{ij} \cdot \mathbf{S}_j - \sum_{i<j} K^{\mathrm{TB2J}}_{ij} (\mathbf{S}_i \cdot \mathbf{S}_j)^2`$):
+$`H = -\sum_{i\lt j} \mathbf{S}_i \cdot \mathbf{J}_{ij} \cdot \mathbf{S}_j - \sum_{i\lt j} K^{\mathrm{TB2J}}_{ij} (\mathbf{S}_i \cdot \mathbf{S}_j)^2`$):
 
 ```math
 \mathcal{J}_{ij} = -\,\mathbf{J}^{\mathrm{TB2J}}_{ij}, \qquad K_{ij} = -\,K^{\mathrm{TB2J}}_{ij}, \qquad \mathbf{A}_{ii} \text{ unchanged.}
