@@ -1,8 +1,8 @@
 # fourstate
 
 Four-state method with VASP for any magnetic material:
-* **energy mapping** → isotropic exchange, the full exchange tensor (DMI, anisotropic exchange) and
-  the single-ion anisotropy;
+* **energy mapping** → isotropic exchange, the full exchange tensor (DMI, anisotropic exchange),
+  the single-ion anisotropy and the biquadratic exchange;
 * **polarization mapping** (Berry phase, same four spin states) → the spin-induced polarization
   (magnetoelectric) tensor of the generalized spin-current (GSC) model.
 
@@ -27,8 +27,12 @@ Requires Python 3 with `numpy`, `ase`, `spglib`.
 | `tensor` | 36 / bond (SOC) | 3×3 J, J_iso, DMI, anisotropic exchange | `analyze.py` |
 | `gsc` | 36 / bond (SOC + Berry phase) | ME tensor M, P = S_i · M · S_j | `analyze_gsc.py` |
 | `sia` | 20 / site (SOC) | single-ion anisotropy A, H = S · A · S | `analyze_sia.py` |
+| `bq` | 4 / bond (SOC) | biquadratic K, H = −J S_i·S_j − K (S_i·S_j)² | `analyze_bq.py` |
 
 For component (a, b): S_i = ±a, S_j = ±b, all other spins along the third axis c.
+`bq`: S_i = x, S_j at 0°, 180°, 45°, 225° in the xy plane, others z:
+K = −[(E1 + E2) − (E3 + E4)] + 2(a_x − a_45), where the single-ion term of j comes from a `sia` run
+(`analyze_bq.py runs_bq --sia runs_sia/results_sia.json`).
 Convention: H = −Σ S_i·J·S_j (unit spins, J > 0 ferromagnetic), as in TB2J.
 
 ## Use
@@ -54,13 +58,14 @@ python fourstate/table.py runs                           # one line per run: E, 
 
 ## Examples
 `examples/NiI2_exchange_and_ME`: monolayer NiI2, Ni 9 – Ni 6 chosen by hand → exchange tensor,
-ME tensor and single-ion anisotropy. `examples/exchange_tensor_VBr3`: bulk VBr3, automatic bonds.
+ME tensor, single-ion anisotropy and biquadratic exchange (Ni 9 – Ni 12). `examples/exchange_tensor_VBr3`: bulk VBr3, automatic bonds.
 
 ## Tests
 ```bash
 python tests/test_energy.py   # known J tensor + spin flip
 python tests/test_gsc.py      # known M tensor + polarization quantum
 python tests/test_sia.py      # known A tensor + reversed spin, --atoms
+python tests/test_bq.py       # known K + single-ion correction + reversed spin
 ```
 
 ## License

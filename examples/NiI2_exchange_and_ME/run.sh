@@ -4,6 +4,7 @@
 #   exchange tensor  : energy mapping        (36 SOC runs, INCAR.exchange)
 #   ME / GSC tensor  : polarization mapping  (36 SOC runs, INCAR.me, Berry phase, fixed geometry)
 #   single-ion aniso : Ni 9 alone            (20 SOC runs)
+#   biquadratic K    : Ni 9 - Ni 12          (4 SOC runs, k1-k4)
 set -e
 R=../..
 P=${POTCARS:?set POTCARS=folder with Ni/POTCAR I/POTCAR}
@@ -13,10 +14,13 @@ python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 6 --mode gsc
        --incar INCAR.me --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_me
 python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 --mode sia \
        --incar INCAR.exchange --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_sia
-for r in runs_exchange runs_me runs_sia; do bash $R/fourstate/submit.sh $r --exe vasp_ncl --dry; done
+python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 12 --mode bq \
+       --incar INCAR.exchange --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_bq
+for r in runs_exchange runs_me runs_sia runs_bq; do bash $R/fourstate/submit.sh $r --exe vasp_ncl --dry; done
 # when finished:
 # python $R/fourstate/analyze.py     runs_exchange   # J tensor (J_iso, DMI, anisotropy)
 # python $R/fourstate/analyze_gsc.py runs_me         # ME tensor M, P = S_i M S_j
 # python $R/fourstate/analyze.py     runs_me         # (the ME runs also give J at the fixed geometry)
 # python $R/fourstate/analyze_sia.py runs_sia        # single-ion anisotropy A
+# python $R/fourstate/analyze_bq.py  runs_bq --sia runs_sia/results_sia.json   # biquadratic K
 # python $R/fourstate/table.py       runs_exchange   # one line per run (E, E_p, spins, P)

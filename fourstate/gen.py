@@ -16,6 +16,7 @@ Modes
   tensor : noncollinear + SOC, 36 runs per bond   -> full 3x3 J (J_iso, DMI, anisotropy)
   gsc    : same 36 states as tensor, with Berry-phase polarization -> GSC tensor M (P = S_i M S_j)
   sia    : only atom i rotated (20 runs)              -> single-ion anisotropy A (H = S A S)
+  bq     : S_i = x, S_j at 0/180/45/225 deg, others z (4 runs) -> biquadratic K (H = -J S_i.S_j - K (S_i.S_j)^2)
 Pair: --bonds (symmetry + automatic supercell) or --atoms i j (by hand, in the given cell)
 For component (a, b): S_i = +-a, S_j = +-b, all other magnetic atoms along c, perpendicular to a and b.
 
@@ -125,6 +126,11 @@ def states(mode):
     """(label, a, b, c, si, sj): S_i = si*a, S_j = sj*b, background along c.
     sia: (label, vi, None, c, 0, 0) with vi the unit vector of S_i (only atom i is rotated)."""
     sg = [(1, 1, 'pp'), (1, -1, 'pm'), (-1, 1, 'mp'), (-1, -1, 'mm')]
+    if mode == 'bq':       # biquadratic: S_i = x, S_j at angle 0, 180, 45, 225 deg in the xy plane, others z
+        t = R2 * (AX['x'] + AX['y'])
+        for lab, vj in (('k1', AX['x']), ('k2', -AX['x']), ('k3', t), ('k4', -t)):
+            yield lab, AX['x'], vj, 'z', 0, 0
+        return
     if mode == 'sia':
         for a, b, c in (('z', 'x', 'y'), ('y', 'x', 'z')):          # A_aa - A_bb, background c
             for lab, v in ((f'{a}p', AX[a]), (f'{a}m', -AX[a]), (f'{b}p', AX[b]), (f'{b}m', -AX[b])):
@@ -160,6 +166,9 @@ def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, k
             v = AX[c] * mom[s]
             if mode == 'sia':
                 if k == I2: v = a * mom[s]
+            elif mode == 'bq':
+                if k == I2: v = a * mom[s]
+                if k == J2: v = b * mom[s]
             else:
                 if k == I2: v = si * AX[a] * mom[s]
                 if k == J2: v = sj * AX[b] * mom[s]
@@ -183,8 +192,9 @@ def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, k
             for s in spec:
                 fh.write(open(os.path.join(potcar_dir, s, 'POTCAR')).read())
     target = [list(v / np.linalg.norm(v)) if np.linalg.norm(v) > 0 else [0, 0, 0] for v in vec]
-    if mode == 'sia':
+    if mode in ('sia', 'bq'):
         a = [float(x) for x in a]
+        b = [float(x) for x in b] if b is not None else None
     json.dump(dict(I=I2, J=J2, a=a, b=b, c=c, si=si, sj=sj, mode=mode, target=target),
               open(f'{d}/state.json', 'w'), indent=1)
 
@@ -219,8 +229,8 @@ def main():
     ap.add_argument('--rclean', type=float, default=None,
                     help='no image of j closer than this to i (A); default = longest selected bond')
     ap.add_argument('--supercell', type=int, nargs=3, help='force a diagonal supercell')
-    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc', 'sia'], default='tensor',
-                    help='sia = single-ion anisotropy of atom i (20 runs)')
+    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc', 'sia', 'bq'], default='tensor',
+                    help='sia = single-ion anisotropy of atom i (20 runs); bq = biquadratic K of a pair (4 runs)')
     ap.add_argument('--incar', help='INCAR template with a {MAGMOM} line')
     ap.add_argument('--potcar-dir', help='folder with <Element>/POTCAR')
     ap.add_argument('--moment', nargs='+', default=['3.0'], help='initial moment: 3  or  Cr=3 Mn=4')
