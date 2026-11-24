@@ -27,7 +27,7 @@ def main():
         if os.path.basename(os.path.normpath(d)) == 'k3':     # S_j reversed -> this run is state k4
             t[J] *= -1
         c = t[I] @ t[J]
-        E = -J0 * c - K0 * c ** 2 + t[J] @ A @ t[J] + t[I] @ A @ t[I]
+        E = J0 * c + K0 * c ** 2 + t[J] @ A @ t[J] + t[I] @ A @ t[I]
         for k in range(len(t)):
             if np.linalg.norm(t[k]) > 0 and k not in (I, J):
                 E -= t[I] @ Kb @ t[k] + t[J] @ Kb @ t[k]
@@ -39,7 +39,7 @@ def main():
     d = glob.glob(f'{out}/runs/*/k3/')[0]                    # redo k3 properly -> K must be exact
     st = json.load(open(f'{d}/state.json')); t = np.array(st['target'], float); I, J = st['I'], st['J']
     c = t[I] @ t[J]
-    E = -J0 * c - K0 * c ** 2 + t[J] @ A @ t[J] + t[I] @ A @ t[I] - sum(
+    E = J0 * c + K0 * c ** 2 + t[J] @ A @ t[J] + t[I] @ A @ t[I] - sum(
         t[I] @ Kb @ t[k] + t[J] @ Kb @ t[k] for k in range(len(t)) if np.linalg.norm(t[k]) > 0 and k not in (I, J))
     outcar(d, E / 1000 - 70.0, 2.0 * t)
     subprocess.run([sys.executable, f'{ROOT}/fourstate/analyze_bq.py', f'{out}/runs', '--sia', f'{out}/sia.json'],

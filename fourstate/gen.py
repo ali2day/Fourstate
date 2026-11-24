@@ -18,7 +18,7 @@ Modes
   me     : 12 runs, background +z: (S_i,S_j) along (x,y), (x,z), (y,z) -> spin-current ME matrix
            P = M_sc (S_i x S_j); k5, k7, k9, k11 (S_j = +z = background) are the same for every j
   sia    : only atom i rotated (20 runs)              -> single-ion anisotropy A (H = S A S)
-  bq     : S_i = x, S_j at 0/180/45/225 deg, others z (4 runs) -> biquadratic K (H = -J S_i.S_j - K (S_i.S_j)^2)
+  bq     : S_i = x, S_j at 0/180/45/225 deg, others z (4 runs) -> biquadratic K (H = S_i.J.S_j + K (S_i.S_j)^2)
 Pair: --bonds (symmetry + automatic supercell) or --atoms i j (by hand, in the given cell)
 For component (a, b): S_i = +-a, S_j = +-b, all other magnetic atoms along c, perpendicular to a and b.
 

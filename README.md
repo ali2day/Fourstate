@@ -28,9 +28,7 @@ H=\sum_i \mathbf S_i\cdot\mathbf A_{ii}\cdot\mathbf S_i
 Unit spins, each pair counted once, meV. $`J\lt 0`$ ferromagnetic, $`K\lt 0`$ favours collinear spins,
 $`A^{zz}\gt 0`$ easy plane. Derivations of every formula: **[CONVENTIONS.md](CONVENTIONS.md)**.
 
-> `analyze.py`, `analyze_sia.py`, `analyze_bq.py` print the TB2J sign
-> ($`H=-\sum_{i\lt j}\mathbf S_i\cdot\mathbf J_{ij}\cdot\mathbf S_j`$, $`J\gt 0`$ ferromagnetic);
-> `paper_convention.py` prints the convention above ($`\mathcal J=-\mathbf J^{\mathrm{TB2J}}`$, $`K=-K^{\mathrm{TB2J}}`$).
+All scripts use this one convention.
 
 ## Four-state formulas
 

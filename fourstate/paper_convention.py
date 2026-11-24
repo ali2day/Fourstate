@@ -8,7 +8,7 @@ arXiv:2407.20489, Eqs. (1)-(2):
     J = Tr(J_ij)/3,   D from (J_ij - J_ij^T)/2,   Gamma = (J_ij + J_ij^T)/2 - J*1
 
 * S_i are UNIT vectors, every pair counted once (i<j), energies in meV.
-* J < 0 ferromagnetic, J > 0 antiferromagnetic (opposite sign to TB2J and to analyze.py).
+* J < 0 ferromagnetic, J > 0 antiferromagnetic (same convention in all scripts of this package).
 * K < 0 favours collinear spins.  A^zz > 0 easy plane, A^zz < 0 easy axis.
 
 Four-state formulas in this convention (S_i = +-a, S_j = +-b, all other spins along c, perpendicular):
@@ -94,7 +94,7 @@ def from_runs(dirs, step):
             if mode == 'sia':
                 sia['_A'] = np.array(r['A'])        # H = S.A.S already, traceless
             else:
-                bq['_K_tb'] = r.get('K')            # analyze_bq.py convention (H = -K c^2), no SIA correction
+                bq['_K_raw'] = r.get('K')           # analyze_bq.py without --sia: no single-ion correction
     return pair, sia, bq, notes
 
 
@@ -158,8 +158,8 @@ def main():
         print(A)
 
     # ---- biquadratic
-    if all(f'k{n}' in bq for n in '1234') or bq.get('_K_tb') is not None:
-        raw = (bq['k1'] + bq['k2'] - bq['k3'] - bq['k4']) if 'k1' in bq else -bq['_K_tb']
+    if all(f'k{n}' in bq for n in '1234') or bq.get('_K_raw') is not None:
+        raw = (bq['k1'] + bq['k2'] - bq['k3'] - bq['k4']) if 'k1' in bq else bq['_K_raw']
         corr = 0.0
         if A is not None and not np.isnan(A[[0, 1, 0], [0, 1, 1]]).any():
             corr = 2 * (A[0, 0] - ((A[0, 0] + A[1, 1]) / 2 + A[0, 1]))

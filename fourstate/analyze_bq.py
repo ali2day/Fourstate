@@ -3,14 +3,15 @@
 
   python analyze_bq.py RUNS [--sia RUNS_SIA/results_sia.json] [--step first|last] [--ignore-penalty]
 
-Model: H = -J S_i.S_j - K (S_i.S_j)^2 + S_j.A.S_j + ...   (unit spins; K > 0 favours collinear spins)
+Model: H = S_i.J.S_j + K (S_i.S_j)^2 + S_j.A.S_j + ...   (unit spins; K < 0 favours collinear spins;
+       convention of arXiv:2407.20489)
 States: S_i = x, others along z, S_j at 0 (k1), 180 (k2), 45 (k3), 225 deg (k4) in the xy plane,
 so c = S_i.S_j = 1, -1, 1/sqrt2, -1/sqrt2.  Coupling to the background is linear in S_j and cancels:
-    (E1 + E2) - (E3 + E4) = -K + 2 [a_x - a_45]
+    (E1 + E2) - (E3 + E4) = K + 2 [a_x - a_45]
     a_x = A_xx,  a_45 = (A_xx + A_yy)/2 + A_xy       (single-ion anisotropy of j)
-    K   = -[(E1 + E2) - (E3 + E4)] + 2 (a_x - a_45)
+    K   = (E1 + E2) - (E3 + E4) - 2 (a_x - a_45)
 The anisotropy term is taken from --sia (results of  --mode sia  for atom j, or an equivalent site);
-without it, it is assumed zero and a warning is printed.  Also  J ~ (E2 - E1)/2  (= J_xx).
+without it, it is assumed zero and a warning is printed.  Also  J_xx = (E1 - E2)/2.
 A run whose spin j ended reversed is relabelled (k1<->k2, k3<->k4); reversed spin i -> rejected.
 """
 import argparse, glob, json, os
@@ -69,8 +70,8 @@ def main():
         r = dict(id=b['id'], d=b['d'], notes=notes)
         print(f'\n{os.path.basename(bd)}   d = {b["d"]:.3f} A')
         if all(k in E for k in ('k1', 'k2', 'k3', 'k4')):
-            K = -((E['k1'] + E['k2']) - (E['k3'] + E['k4'])) + corr
-            Jxx = (E['k2'] - E['k1']) / 2
+            K = (E['k1'] + E['k2']) - (E['k3'] + E['k4']) - corr
+            Jxx = (E['k1'] - E['k2']) / 2
             r.update(K=K, J_xx=Jxx, sia_correction=corr)
             print('   K (biquadratic) = %+.4f meV     J_xx = %+.3f meV' % (K, Jxx))
         print('   ' + cnote)

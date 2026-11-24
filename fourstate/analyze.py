@@ -3,8 +3,8 @@
 
   python analyze.py RUNS [--step first|last] [--ignore-penalty] [--cosmin 0.9]
 
-H = - sum_<ij> S_i^T J_ij S_j  (unit spins, J > 0 = FM, same as TB2J)
-J_ab = [E(+a,-b) + E(-a,+b) - E(+a,+b) - E(-a,-b)] / 4
+H = sum_{i<j} S_i.J_ij.S_j  (unit spins, each pair once, J < 0 = FM; arXiv:2407.20489)
+J_ab = [E(+a,+b) + E(-a,-b) - E(+a,-b) - E(-a,+b)] / 4
 Output per bond: 3x3 J (meV), J_iso = Tr/3, DMI D = (J_yz-J_zy, J_zx-J_xz, J_xy-J_yx)/2,
 symmetric traceless anisotropy.  Written to RUNS/results.json.
 Every run is placed by the ACTUAL signs of its bond spins (constraints can flip them);
@@ -31,7 +31,7 @@ def main():
             for y in 'xyz':
                 k = [(x, y, s, t) for s, t in ((1, -1), (-1, 1), (1, 1), (-1, -1))]
                 if all(q in E for q in k):
-                    J[AX[x], AX[y]] = 1000 * (E[k[0]] + E[k[1]] - E[k[2]] - E[k[3]]) / 4
+                    J[AX[x], AX[y]] = 1000 * (E[k[2]] + E[k[3]] - E[k[0]] - E[k[1]]) / 4
         r = dict(id=b['id'], d=b['d'], J=J.tolist(), notes=notes)
         print(f'\nbond {b["id"]:2d}  d = {b["d"]:.3f} A')
         if meta['mode'] == 'iso':

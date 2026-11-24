@@ -25,7 +25,7 @@ def main():
         I, J = st['I'], st['J']
         if os.path.basename(os.path.normpath(d)) == 'xy_pp':      # spin flip of S_J
             t[J] *= -1
-        E = -t[I] @ J0 @ t[J]
+        E = t[I] @ J0 @ t[J]
         for k in range(len(t)):
             if np.linalg.norm(t[k]) > 0 and k not in (I, J):
                 E -= t[I] @ K @ t[k] + t[J] @ K @ t[k]

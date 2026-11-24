@@ -37,14 +37,7 @@ D^{z}_{ij} = \tfrac{1}{2}\left( \mathcal{J}^{xy}_{ij} - \mathcal{J}^{yx}_{ij} \r
 * $`A^{zz} \gt  0`$: easy plane, $`A^{zz} \lt  0`$: easy axis.
 * $`x, y, z`$ are the Cartesian axes of the VASP cell (the directions written in `MAGMOM` / `M_CONSTR`, `SAXIS = 0 0 1`).
 
-**Relation to the TB2J sign** (used by `analyze.py`, `analyze_sia.py`, `analyze_bq.py`,
-$`H = -\sum_{i\lt j} \mathbf{S}_i \cdot \mathbf{J}_{ij} \cdot \mathbf{S}_j - \sum_{i\lt j} K^{\mathrm{TB2J}}_{ij} (\mathbf{S}_i \cdot \mathbf{S}_j)^2`$):
-
-```math
-\mathcal{J}_{ij} = -\,\mathbf{J}^{\mathrm{TB2J}}_{ij}, \qquad K_{ij} = -\,K^{\mathrm{TB2J}}_{ij}, \qquad \mathbf{A}_{ii} \text{ unchanged.}
-```
-
-`paper_convention.py` reports everything in the convention of this section.
+All scripts of this package (`analyze.py`, `analyze_sia.py`, `analyze_bq.py`, `paper_convention.py`) use this convention.
 
 ---
 
