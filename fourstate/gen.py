@@ -1,0 +1,253 @@
+#!/usr/bin/env python
+"""Four-state method (energy mapping for exchange, polarization mapping for the GSC model):
+VASP input generator for any magnetic material.
+
+Refs: Xiang et al., PRB 84, 224429 (2011); Dalton Trans. 42, 823 (2013);
+      GSC model: Xiang et al., PRL 107, 157202 (2011).
+
+Steps
+  1. find all pairs of magnetic atoms up to --rmax in the input cell
+  2. group them into symmetry-inequivalent bonds (spglib)
+  3. choose the smallest diagonal supercell with no periodic image of j within --rclean of i
+  4. write one VASP folder per spin state (+ state.json with the target spins)
+
+Modes
+  iso    : collinear, 4 runs per bond             -> isotropic J
+  tensor : noncollinear + SOC, 36 runs per bond   -> full 3x3 J (J_iso, DMI, anisotropy)
+  gsc    : same 36 states as tensor, with Berry-phase polarization -> GSC tensor M (P = S_i M S_j)
+For component (a, b): S_i = +-a, S_j = +-b, all other magnetic atoms along c, perpendicular to a and b.
+
+Usage
+  python gen.py list  --poscar POSCAR --mag Cr --rmax 8
+  python gen.py build --poscar POSCAR --mag Cr --bonds 0 1 --mode tensor \
+                      --incar templates/INCAR.tensor --moment 3 --out runs
+"""
+import argparse, json, os, itertools
+import numpy as np
+import spglib
+from ase.io import read, write
+from ase.build import make_supercell
+
+AX = {'x': np.array([1., 0, 0]), 'y': np.array([0, 1., 0]), 'z': np.array([0, 0, 1.])}
+
+
+# ---------------------------------------------------------------- bonds
+def pairs(atoms, mag, rmax):
+    """All (i, j, R, d) with i, j magnetic and 0 < |r_j + R - r_i| <= rmax."""
+    cell, pos = atoms.cell.array, atoms.positions
+    idx = [k for k, s in enumerate(atoms.get_chemical_symbols()) if s in mag]
+    n = [int(np.ceil(rmax / (atoms.cell.volume / np.linalg.norm(np.cross(cell[(k + 1) % 3], cell[(k + 2) % 3]))))) + 1
+         for k in range(3)]
+    out = []
+    for i in idx:
+        for j in idx:
+            for R in itertools.product(*[range(-m, m + 1) for m in n]):
+                d = np.linalg.norm(pos[j] + np.array(R) @ cell - pos[i])
+                if 1e-3 < d <= rmax:
+                    out.append((i, j, tuple(R), d))
+    return out
+
+
+def classes(atoms, mag, rmax, symprec=1e-3):
+    """Symmetry-inequivalent bonds, sorted by distance."""
+    sym = spglib.get_symmetry((atoms.cell.array, atoms.get_scaled_positions(), atoms.numbers), symprec=symprec)
+    frac, nat = atoms.get_scaled_positions(), len(atoms)
+
+    def image(k, f):
+        for m in range(nat):
+            dR = f - frac[m]
+            if np.allclose(dR, np.round(dR), atol=1e-3) and atoms.numbers[m] == atoms.numbers[k]:
+                return m, tuple(np.round(dR).astype(int))
+        raise RuntimeError('symmetry image not found (try another --symprec)')
+
+    P = pairs(atoms, mag, rmax)
+    keys = {(p[0], p[1], p[2]) for p in P}
+    seen, out = set(), []
+    for p in sorted(P, key=lambda x: (round(x[3], 4), x[0], x[1], x[2])):
+        if (p[0], p[1], p[2]) in seen:
+            continue
+        orbit = set()
+        for Rm, t in zip(sym['rotations'], sym['translations']):
+            mi, Ri = image(p[0], Rm @ frac[p[0]] + t)
+            mj, Rj = image(p[1], Rm @ (frac[p[1]] + np.array(p[2])) + t)
+            R = tuple(np.array(Rj) - np.array(Ri))
+            orbit.add((mi, mj, R))
+            orbit.add((mj, mi, tuple(-np.array(R))))          # (i,j) ~ (j,i)
+        seen |= orbit
+        out.append(dict(i=p[0], j=p[1], R=[int(x) for x in p[2]], d=round(p[3], 4),
+                        mult=len(orbit & keys)))
+    for n, c in enumerate(out):
+        c['id'] = n
+    return out
+
+
+# ---------------------------------------------------------------- supercell
+def supercell_ok(atoms, P, bond, rclean):
+    """No image of j (other than the bond partner) within rclean of i."""
+    L = P @ atoms.cell.array
+    pi = atoms.positions[bond['i']]
+    pj = atoms.positions[bond['j']] + np.array(bond['R']) @ atoms.cell.array
+    return all(np.linalg.norm(pj + np.array(n) @ L - pi) >= rclean
+               for n in itertools.product(range(-2, 3), repeat=3) if n != (0, 0, 0))
+
+
+def choose_supercell(atoms, bonds, rclean, nmax=4):
+    ok = [n for n in itertools.product(range(1, nmax + 1), repeat=3)
+          if all(supercell_ok(atoms, np.diag(n), b, rclean) for b in bonds)]
+    if not ok:
+        raise SystemExit('no diagonal supercell up to %d found; lower --rclean or use --supercell' % nmax)
+    return np.diag(min(ok, key=np.prod))
+
+
+def map_bond(atoms, P, bond):
+    """Supercell and the indices (I, J) of the bond atoms in it."""
+    sc = make_supercell(atoms, P)
+    pi = atoms.positions[bond['i']]
+    pj = atoms.positions[bond['j']] + np.array(bond['R']) @ atoms.cell.array
+    sf = sc.get_scaled_positions()
+    IJ = []
+    for f in sc.cell.scaled_positions(np.array([pi, pj])):
+        d = sf - f
+        d -= np.round(d)
+        IJ.append(int(np.argmin(np.linalg.norm(d @ sc.cell.array, axis=1))))
+    I, J = IJ
+    assert abs(sc.get_distance(I, J, mic=True) - bond['d']) < 1e-3, 'bond mapping failed'
+    return sc, I, J
+
+
+# ---------------------------------------------------------------- states
+def states(mode):
+    """(label, a, b, c, si, sj): S_i = si*a, S_j = sj*b, background along c."""
+    sg = [(1, 1, 'pp'), (1, -1, 'pm'), (-1, 1, 'mp'), (-1, -1, 'mm')]
+    if mode == 'iso':
+        for si, sj, t in sg:
+            yield t, 'z', 'z', 'z', si, sj
+        return
+    for a in 'xyz':
+        for b in 'xyz':
+            c = [x for x in 'xyz' if x not in (a, b)][0]
+            for si, sj, t in sg:
+                yield f'{a}{b}_{t}', a, b, c, si, sj
+
+
+def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, kpts, relax):
+    os.makedirs(d, exist_ok=True)
+    spec = list(dict.fromkeys(sc.get_chemical_symbols()))          # species order of the input POSCAR
+    order = np.argsort([spec.index(s) for s in sc.get_chemical_symbols()], kind='stable')
+    s2 = sc[order]
+    inv = {int(o): k for k, o in enumerate(order)}
+    I2, J2 = inv[I], inv[J]
+    write(f'{d}/POSCAR', s2, format='vasp', direct=True, sort=False)
+    syms = s2.get_chemical_symbols()
+    vec = []
+    for k, s in enumerate(syms):
+        v = np.zeros(3)
+        if s in mag:
+            v = AX[c] * mom[s]
+            if k == I2: v = si * AX[a] * mom[s]
+            if k == J2: v = sj * AX[b] * mom[s]
+        vec.append(v)
+    if mode == 'iso':
+        line = 'MAGMOM = ' + ' '.join('%.3f' % v[2] for v in vec)
+    else:
+        f = ' '.join('%.3f %.3f %.3f' % tuple(v) for v in vec)
+        line = f'MAGMOM = {f}\nM_CONSTR = {f}'
+    txt = open(incar).read()
+    if '{MAGMOM}' not in txt:
+        raise SystemExit('INCAR template needs a {MAGMOM} line')
+    txt = txt.replace('{MAGMOM}', line)
+    if relax:
+        txt += ('\n# ionic relaxation in this spin state, cell fixed\nIBRION = 2\nISIF = 2\n'
+                f'NSW = {relax}\nEDIFFG = -0.01\n')
+    open(f'{d}/INCAR', 'w', newline='\n').write(txt)
+    open(f'{d}/KPOINTS', 'w', newline='\n').write('Gamma-centred\n0\nGamma\n%d %d %d\n0 0 0\n' % tuple(kpts))
+    if potcar_dir:
+        with open(f'{d}/POTCAR', 'w', newline='\n') as fh:
+            for s in spec:
+                fh.write(open(os.path.join(potcar_dir, s, 'POTCAR')).read())
+    target = [list(v / np.linalg.norm(v)) if np.linalg.norm(v) > 0 else [0, 0, 0] for v in vec]
+    json.dump(dict(I=I2, J=J2, a=a, b=b, c=c, si=si, sj=sj, mode=mode, target=target),
+              open(f'{d}/state.json', 'w'), indent=1)
+
+
+def moments(mag, spec):
+    """--moment 3  or  --moment Cr=3 Mn=4"""
+    out = {}
+    for t in spec:
+        if '=' in t:
+            k, v = t.split('=')
+            out[k] = float(v)
+        else:
+            out.update({m: float(t) for m in mag})
+    missing = [m for m in mag if m not in out]
+    if missing:
+        raise SystemExit(f'no --moment for {missing}')
+    return out
+
+
+# ---------------------------------------------------------------- main
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('cmd', choices=['list', 'build'])
+    ap.add_argument('--poscar', required=True, help='structure (any format ASE reads)')
+    ap.add_argument('--mag', nargs='+', required=True, help='magnetic element(s), e.g. Cr  or  Fe Co')
+    ap.add_argument('--rmax', type=float, default=8.0, help='longest bond to list (A)')
+    ap.add_argument('--symprec', type=float, default=1e-3)
+    ap.add_argument('--bonds', type=int, nargs='*', help='bond ids from "list"')
+    ap.add_argument('--rclean', type=float, default=None,
+                    help='no image of j closer than this to i (A); default = longest selected bond')
+    ap.add_argument('--supercell', type=int, nargs=3, help='force a diagonal supercell')
+    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc'], default='tensor')
+    ap.add_argument('--incar', help='INCAR template with a {MAGMOM} line')
+    ap.add_argument('--potcar-dir', help='folder with <Element>/POTCAR')
+    ap.add_argument('--moment', nargs='+', default=['3.0'], help='initial moment: 3  or  Cr=3 Mn=4')
+    ap.add_argument('--kspacing', type=float, default=0.25, help='Gamma grid density (1/A)')
+    ap.add_argument('--kpts', type=int, nargs=3, help='force the Gamma k-grid')
+    ap.add_argument('--relax', type=int, default=0, metavar='NSW',
+                    help='relax ions in every state (not standard; not allowed for gsc)')
+    ap.add_argument('--out', default='runs')
+    a = ap.parse_args()
+
+    atoms = read(a.poscar)
+    cl = classes(atoms, a.mag, a.rmax, a.symprec)
+    if a.cmd == 'list':
+        sg = spglib.get_spacegroup((atoms.cell.array, atoms.get_scaled_positions(), atoms.numbers), a.symprec)
+        print(f'space group {sg};  {len(cl)} inequivalent bonds between {"/".join(a.mag)} up to {a.rmax} A')
+        print(' id   d(A)   i   j   R             mult')
+        for c in cl:
+            print('%3d  %6.3f %3d %3d   %-13s %3d' % (c['id'], c['d'], c['i'], c['j'], c['R'], c['mult']))
+        return
+
+    if not (a.bonds and a.incar):
+        raise SystemExit('build needs --bonds and --incar')
+    if a.mode == 'gsc' and a.relax:
+        raise SystemExit('gsc needs one fixed geometry for all states (no --relax)')
+    mom = moments(a.mag, a.moment)
+    sel = [c for c in cl if c['id'] in a.bonds]
+    rclean = a.rclean or max(b['d'] for b in sel)
+    P = np.diag(a.supercell) if a.supercell else choose_supercell(atoms, sel, rclean)
+    for b in sel:
+        if not supercell_ok(atoms, P, b, rclean):
+            print('WARNING bond %d: an image of j is closer than %.2f A in this supercell' % (b['id'], rclean))
+    sc0, _, _ = map_bond(atoms, P, sel[0])
+    rec = np.linalg.norm(np.linalg.inv(sc0.cell.array).T, axis=1)            # 1/A (no 2 pi)
+    kpts = a.kpts or [max(1, int(np.ceil(x / a.kspacing))) for x in rec]
+    print('supercell', np.diag(P).tolist(), '| atoms', len(sc0), '| k-grid', kpts)
+    os.makedirs(a.out, exist_ok=True)
+    meta = dict(poscar=os.path.abspath(a.poscar), mag=a.mag, supercell=np.diag(P).tolist(), mode=a.mode,
+                relax=a.relax, kpts=kpts, bonds=[])
+    for b in sel:
+        sc, I, J = map_bond(atoms, P, b)
+        bd = f'bond{b["id"]:02d}_d{b["d"]:.3f}'
+        n = 0
+        for lab, x, y, z, si, sj in states(a.mode):
+            write_run(f'{a.out}/{bd}/{lab}', sc, a.mag, mom, I, J, x, y, z, si, sj, a.mode, a.incar,
+                      a.potcar_dir, kpts, a.relax)
+            n += 1
+        meta['bonds'].append(dict(b, dir=bd, runs=n))
+        print(f'  bond {b["id"]:2d}  d = {b["d"]:.3f} A  {n} runs -> {a.out}/{bd}')
+    json.dump(meta, open(f'{a.out}/meta.json', 'w'), indent=1)
+
+
+if __name__ == '__main__':
+    main()

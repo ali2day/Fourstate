@@ -1,0 +1,39 @@
+SYSTEM = 4-state SOC (GSC polarization)
+PREC     = Accurate
+ENCUT    = 500          # set for your POTCARs
+ISTART   = 0
+ICHARG   = 2
+LASPH    = .TRUE.
+LREAL    = .FALSE.
+ISYM     = -1           # spin states break the symmetry
+ALGO     = Fast
+EDIFF    = 1E-7         # J needs tight energies
+NELM     = 400
+ISMEAR   = 0
+SIGMA    = 0.01
+AMIX     = 0.1
+AMIX_MAG = 0.4
+LMAXMIX  = 4            # 6 for f elements
+
+# DFT+U (optional). One value per species, in the species order of your input POSCAR.
+# LDAU      = .TRUE.
+# LDAUTYPE  = 2
+# LDAUL     = 2 -1
+# LDAUU     = 3.0 0.0
+# LDAUJ     = 0.0 0.0
+
+LSORBIT  = .TRUE.
+LNONCOLLINEAR = .TRUE.
+SAXIS    = 0 0 1
+GGA_COMPAT = .FALSE.
+I_CONSTRAINED_M = 1     # fixes the spin axes (not the sign: the analysis checks signs)
+LAMBDA   = 10
+RWIGS    = 1.2 1.2      # one Wigner-Seitz radius per species
+{MAGMOM}
+
+LCALCPOL = .TRUE.       # Berry phase p[elc], p[ion] (insulators only)
+DIPOL    = 0.5 0.5 0.5
+
+LORBIT   = 11           # needed: the analysis checks every moment
+LWAVE    = .FALSE.
+LCHARG   = .FALSE.
