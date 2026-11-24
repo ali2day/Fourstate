@@ -1,12 +1,22 @@
 #!/bin/bash
-# Monolayer NiI2: exchange tensor (energy mapping) AND magnetoelectric GSC tensor (Berry-phase
-# polarization mapping) of the nearest-neighbour Ni-Ni bond, from the SAME 36 SOC runs.
-# 5x5 supercell (75 atoms), Gamma 2x2x1, initial Ni moment 1.25 muB (avoids a high-moment SCF trap).
+# Monolayer NiI2 (6x3 cell, 18 Ni), nearest-neighbour bond between Ni 9 and Ni 6 (POSCAR numbering),
+# chosen by hand as in the original 4states scripts (atom1 = 9, atom2 = 6, s = 2 muB).
+#   exchange tensor  : energy mapping        (36 SOC runs, INCAR.exchange)
+#   ME / GSC tensor  : polarization mapping  (36 SOC runs, INCAR.me, Berry phase, fixed geometry)
+#   single-ion aniso : Ni 9 alone            (20 SOC runs)
 set -e
 R=../..
-python $R/fourstate/gen.py list  --poscar POSCAR --mag Ni --rmax 8
-python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --bonds 0 --mode gsc        --incar INCAR --moment 1.25 --supercell 5 5 1 --kpts 2 2 1        --potcar-dir ${POTCARS:?set POTCARS=folder with Ni/POTCAR I/POTCAR} --out runs
-bash $R/fourstate/submit.sh runs --exe vasp_ncl --dry      # remove --dry to submit
+P=${POTCARS:?set POTCARS=folder with Ni/POTCAR I/POTCAR}
+python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 6 --mode tensor \
+       --incar INCAR.exchange --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_exchange
+python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 6 --mode gsc \
+       --incar INCAR.me --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_me
+python $R/fourstate/gen.py build --poscar POSCAR --mag Ni --atoms 9 --mode sia \
+       --incar INCAR.exchange --moment 2 --kpts 2 2 1 --potcar-dir $P --out runs_sia
+for r in runs_exchange runs_me runs_sia; do bash $R/fourstate/submit.sh $r --exe vasp_ncl --dry; done
 # when finished:
-# python $R/fourstate/analyze.py runs       # J tensor: J_iso, DMI, anisotropy  (energies)
-# python $R/fourstate/analyze_gsc.py runs   # ME / GSC tensor M, P = S_i M S_j   (polarizations)
+# python $R/fourstate/analyze.py     runs_exchange   # J tensor (J_iso, DMI, anisotropy)
+# python $R/fourstate/analyze_gsc.py runs_me         # ME tensor M, P = S_i M S_j
+# python $R/fourstate/analyze.py     runs_me         # (the ME runs also give J at the fixed geometry)
+# python $R/fourstate/analyze_sia.py runs_sia        # single-ion anisotropy A
+# python $R/fourstate/table.py       runs_exchange   # one line per run (E, E_p, spins, P)

@@ -9,10 +9,26 @@ SLOTS = ((1, 1), (1, -1), (-1, 1), (-1, -1))       # pp, pm, mp, mm
 def read_outcar(path, nat, step=-1):
     """Energy, constraint penalty, moments, dipole of ionic step `step` (0 = first, -1 = last)."""
     txt = open(path, errors='replace').read()
-    e = re.findall(r'free  energy   TOTEN  =\s+(\S+) eV', txt)
-    if not e:
+    # converged energy of every ionic step: 'energy  without entropy=  ...  energy(sigma->0) = E'
+    # (the same line the eng_press scripts read; per-SCF lines are written differently)
+    fin = list(re.finditer(r'energy  without entropy=\s*\S+\s+energy\(sigma->0\)\s*=\s*(\S+)', txt))
+    if not fin:
+        fin = list(re.finditer(r'free  energy   TOTEN  =\s+(\S+) eV', txt))
+    if not fin:
         return None
-    ep = re.findall(r'E_p\s*=\s*(\S+)', txt)
+    e = [m.group(1) for m in fin]
+    ep = ['0']                         # constraint penalty: only in OSZICAR, last E_p before ionic step `step`
+    osz = os.path.join(os.path.dirname(path), 'OSZICAR')
+    if os.path.exists(osz):
+        cur, per_step = None, []
+        for ln in open(osz, errors='replace'):
+            m = re.search(r'E_p\s*=\s*(\S+)', ln)
+            if m:
+                cur = m.group(1)
+            if ' F= ' in ln:
+                per_step.append(cur or '0')
+        if per_step and len(per_step) >= (step + 1 if step >= 0 else -step):
+            ep = [per_step[step]]
     tables = {}
     for comp in 'xyz':
         blocks = txt.split(f' magnetization ({comp})')[1:]
@@ -40,7 +56,7 @@ def read_outcar(path, nat, step=-1):
     conv = 'aborting loop because EDIFF is reached' in txt
     if re.search(r'^\s*NSW\s*=\s*[1-9]', txt, re.M):
         conv = conv and 'reached required accuracy' in txt
-    return dict(E=float(e[step]), Ep=float(ep[step]) if ep else 0.0, m=m, dip=dip, conv=conv,
+    return dict(E=float(e[step]), Ep=float(ep[0]), m=m, dip=dip, conv=conv,
                 nsteps=nsteps)
 
 

@@ -1,0 +1,38 @@
+SYSTEM  = NiI2661
+
+ISMEAR  = 0       ! 0 gauss, for metal 1 methfessel-paxton, -1 fermi, -4 or -5 tet,
+SIGMA   = 0.01    ! width of the smearing
+IBRION  = 2       ! 2 CG, 0 MD, 1 quasi-New
+
+NSW     = 300     ! # of steps for IOM (ions relax in every spin state; NSW = 0 for one fixed geometry)
+ENCUT   = 500     ! cut-off energy for plane wave basis set
+EDIFF   = 1E-7    ! energy convergence
+ISPIN   = 2
+{MAGMOM}
+
+I_CONSTRAINED_M = 1
+RWIGS           = 1.286 1.487
+LAMBDA          = 10
+
+LORBIT  = 11      ! 0 simple, 1 ext, 2 COOP (PROOUT)
+
+LSORBIT = T       ! spin-orbit coupling
+SAXIS   =  0 0 1  ! direction of the magnetic field
+LMAXMIX = 4       ! for d-orb 4, f-orb
+GGA_COMPAT = .FALSE. ! apply spherical cutoff on gradient field
+
+ALGO    = Fast
+NPAR    = 4
+
+LWAVE   = F      ! write WAVECAR
+LCHARG  = F      ! write CHGCAR
+
+########
+LDAU      = T
+LDAUTYPE  = 2
+LDAUL     = 2 -1         ! -1, 1, 2, and 3 for none, p, d, and f
+LDAUU     = 4.8377  0
+LDAUJ     = 0  0
+LDAUPRINT = 1
+LASPH     = T
+########

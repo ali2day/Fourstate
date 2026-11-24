@@ -15,6 +15,8 @@ Modes
   iso    : collinear, 4 runs per bond             -> isotropic J
   tensor : noncollinear + SOC, 36 runs per bond   -> full 3x3 J (J_iso, DMI, anisotropy)
   gsc    : same 36 states as tensor, with Berry-phase polarization -> GSC tensor M (P = S_i M S_j)
+  sia    : only atom i rotated (20 runs)              -> single-ion anisotropy A (H = S A S)
+Pair: --bonds (symmetry + automatic supercell) or --atoms i j (by hand, in the given cell)
 For component (a, b): S_i = +-a, S_j = +-b, all other magnetic atoms along c, perpendicular to a and b.
 
 Usage
@@ -116,9 +118,21 @@ def map_bond(atoms, P, bond):
 
 
 # ---------------------------------------------------------------- states
+R2 = 1 / np.sqrt(2)
+
+
 def states(mode):
-    """(label, a, b, c, si, sj): S_i = si*a, S_j = sj*b, background along c."""
+    """(label, a, b, c, si, sj): S_i = si*a, S_j = sj*b, background along c.
+    sia: (label, vi, None, c, 0, 0) with vi the unit vector of S_i (only atom i is rotated)."""
     sg = [(1, 1, 'pp'), (1, -1, 'pm'), (-1, 1, 'mp'), (-1, -1, 'mm')]
+    if mode == 'sia':
+        for a, b, c in (('z', 'x', 'y'), ('y', 'x', 'z')):          # A_aa - A_bb, background c
+            for lab, v in ((f'{a}p', AX[a]), (f'{a}m', -AX[a]), (f'{b}p', AX[b]), (f'{b}m', -AX[b])):
+                yield f'{a}{b}_{lab}', v, None, c, 0, 0
+        for a, b, c in (('x', 'y', 'z'), ('x', 'z', 'y'), ('y', 'z', 'x')):   # A_ab: tilted 45 deg
+            for si, sj, t in sg:
+                yield f't{a}{b}_{t}', R2 * (si * AX[a] + sj * AX[b]), None, c, si, sj
+        return
     if mode == 'iso':
         for si, sj, t in sg:
             yield t, 'z', 'z', 'z', si, sj
@@ -136,7 +150,7 @@ def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, k
     order = np.argsort([spec.index(s) for s in sc.get_chemical_symbols()], kind='stable')
     s2 = sc[order]
     inv = {int(o): k for k, o in enumerate(order)}
-    I2, J2 = inv[I], inv[J]
+    I2, J2 = inv[I], (inv[J] if J is not None else None)
     write(f'{d}/POSCAR', s2, format='vasp', direct=True, sort=False)
     syms = s2.get_chemical_symbols()
     vec = []
@@ -144,8 +158,11 @@ def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, k
         v = np.zeros(3)
         if s in mag:
             v = AX[c] * mom[s]
-            if k == I2: v = si * AX[a] * mom[s]
-            if k == J2: v = sj * AX[b] * mom[s]
+            if mode == 'sia':
+                if k == I2: v = a * mom[s]
+            else:
+                if k == I2: v = si * AX[a] * mom[s]
+                if k == J2: v = sj * AX[b] * mom[s]
         vec.append(v)
     if mode == 'iso':
         line = 'MAGMOM = ' + ' '.join('%.3f' % v[2] for v in vec)
@@ -166,6 +183,8 @@ def write_run(d, sc, mag, mom, I, J, a, b, c, si, sj, mode, incar, potcar_dir, k
             for s in spec:
                 fh.write(open(os.path.join(potcar_dir, s, 'POTCAR')).read())
     target = [list(v / np.linalg.norm(v)) if np.linalg.norm(v) > 0 else [0, 0, 0] for v in vec]
+    if mode == 'sia':
+        a = [float(x) for x in a]
     json.dump(dict(I=I2, J=J2, a=a, b=b, c=c, si=si, sj=sj, mode=mode, target=target),
               open(f'{d}/state.json', 'w'), indent=1)
 
@@ -194,10 +213,14 @@ def main():
     ap.add_argument('--rmax', type=float, default=8.0, help='longest bond to list (A)')
     ap.add_argument('--symprec', type=float, default=1e-3)
     ap.add_argument('--bonds', type=int, nargs='*', help='bond ids from "list"')
+    ap.add_argument('--atoms', type=int, nargs='+', metavar='N',
+                    help='choose i (and j) yourself: atom numbers (1-based, POSCAR order) in the GIVEN cell, '
+                         'which is used as it is (e.g. a defect supercell); one atom for --mode sia')
     ap.add_argument('--rclean', type=float, default=None,
                     help='no image of j closer than this to i (A); default = longest selected bond')
     ap.add_argument('--supercell', type=int, nargs=3, help='force a diagonal supercell')
-    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc'], default='tensor')
+    ap.add_argument('--mode', choices=['iso', 'tensor', 'gsc', 'sia'], default='tensor',
+                    help='sia = single-ion anisotropy of atom i (20 runs)')
     ap.add_argument('--incar', help='INCAR template with a {MAGMOM} line')
     ap.add_argument('--potcar-dir', help='folder with <Element>/POTCAR')
     ap.add_argument('--moment', nargs='+', default=['3.0'], help='initial moment: 3  or  Cr=3 Mn=4')
@@ -218,34 +241,58 @@ def main():
             print('%3d  %6.3f %3d %3d   %-13s %3d' % (c['id'], c['d'], c['i'], c['j'], c['R'], c['mult']))
         return
 
-    if not (a.bonds and a.incar):
-        raise SystemExit('build needs --bonds and --incar')
+    if not ((a.bonds or a.atoms) and a.incar):
+        raise SystemExit('build needs --incar and --bonds or --atoms')
     if a.mode == 'gsc' and a.relax:
         raise SystemExit('gsc needs one fixed geometry for all states (no --relax)')
     mom = moments(a.mag, a.moment)
-    sel = [c for c in cl if c['id'] in a.bonds]
-    rclean = a.rclean or max(b['d'] for b in sel)
-    P = np.diag(a.supercell) if a.supercell else choose_supercell(atoms, sel, rclean)
-    for b in sel:
-        if not supercell_ok(atoms, P, b, rclean):
-            print('WARNING bond %d: an image of j is closer than %.2f A in this supercell' % (b['id'], rclean))
-    sc0, _, _ = map_bond(atoms, P, sel[0])
+
+    if a.atoms:                                        # user-chosen atoms in the given cell
+        P = np.diag(a.supercell or [1, 1, 1])
+        sc = make_supercell(atoms, P)
+        I = a.atoms[0] - 1
+        J = a.atoms[1] - 1 if len(a.atoms) > 1 else None
+        for k in [I] + ([J] if J is not None else []):
+            if sc.get_chemical_symbols()[k] not in a.mag:
+                raise SystemExit(f'atom {k + 1} is {sc.get_chemical_symbols()[k]}, not in --mag')
+        if a.mode != 'sia' and J is None:
+            raise SystemExit('--atoms needs two atoms (i j) for this mode')
+        d = float(sc.get_distance(I, J, mic=True)) if J is not None else 0.0
+        if J is not None:
+            near = sorted(np.linalg.norm(sc.positions[J] + np.array(n) @ sc.cell.array - sc.positions[I])
+                          for n in itertools.product(range(-2, 3), repeat=3))
+            if len(near) > 1 and near[1] < (a.rclean or d) + 1e-6:
+                print('WARNING: another periodic image of j is only %.2f A from i (bond %.2f A)' % (near[1], d))
+        jobs = [(dict(id=-1, i=I + 1, j=(J + 1 if J is not None else None), d=round(d, 4)), sc, I, J,
+                 f'atoms{I + 1}_{J + 1}_d{d:.3f}' if J is not None else f'site{I + 1}')]
+    else:
+        sel = [c for c in cl if c['id'] in a.bonds]
+        rclean = a.rclean or max(b['d'] for b in sel)
+        P = np.diag(a.supercell) if a.supercell else choose_supercell(atoms, sel, rclean)
+        for b in sel:
+            if not supercell_ok(atoms, P, b, rclean):
+                print('WARNING bond %d: an image of j is closer than %.2f A in this supercell' % (b['id'], rclean))
+        jobs = []
+        for b in sel:
+            sc, I, J = map_bond(atoms, P, b)
+            if a.mode == 'sia':
+                J = None
+            jobs.append((b, sc, I, J, f'bond{b["id"]:02d}_d{b["d"]:.3f}' if a.mode != 'sia' else f'site{I + 1}'))
+    sc0 = jobs[0][1]
     rec = np.linalg.norm(np.linalg.inv(sc0.cell.array).T, axis=1)            # 1/A (no 2 pi)
     kpts = a.kpts or [max(1, int(np.ceil(x / a.kspacing))) for x in rec]
-    print('supercell', np.diag(P).tolist(), '| atoms', len(sc0), '| k-grid', kpts)
+    print('cell', np.diag(P).tolist(), '| atoms', len(sc0), '| k-grid', kpts)
     os.makedirs(a.out, exist_ok=True)
     meta = dict(poscar=os.path.abspath(a.poscar), mag=a.mag, supercell=np.diag(P).tolist(), mode=a.mode,
                 relax=a.relax, kpts=kpts, bonds=[])
-    for b in sel:
-        sc, I, J = map_bond(atoms, P, b)
-        bd = f'bond{b["id"]:02d}_d{b["d"]:.3f}'
+    for b, sc, I, J, bd in jobs:
         n = 0
         for lab, x, y, z, si, sj in states(a.mode):
             write_run(f'{a.out}/{bd}/{lab}', sc, a.mag, mom, I, J, x, y, z, si, sj, a.mode, a.incar,
                       a.potcar_dir, kpts, a.relax)
             n += 1
         meta['bonds'].append(dict(b, dir=bd, runs=n))
-        print(f'  bond {b["id"]:2d}  d = {b["d"]:.3f} A  {n} runs -> {a.out}/{bd}')
+        print(f'  {bd}: {n} runs -> {a.out}/{bd}')
     json.dump(meta, open(f'{a.out}/meta.json', 'w'), indent=1)
 
 
